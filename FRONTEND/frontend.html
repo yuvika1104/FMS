@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>File Management and Analysis System</title>
+  <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.development.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.22.5/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+    body {
+      font-family: 'Poppins', sans-serif;
+      background-color: #f9fafb; /* Fallback background */
+    }
+    .card {
+      background: rgba(255, 255, 255, 0.9);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 0 8px 32px rgba(31, 38, 135, 0.1);
+    }
+    .gradient-bg {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+    }
+    .gradient-text {
+      background: linear-gradient(to right, #667eea, #764ba2);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-fill-color: transparent;
+    }
+    .gradient-btn {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      transition: all 0.3s ease;
+    }
+    .gradient-btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+    }
+    .gradient-btn:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
+    .drag-hover {
+      background: linear-gradient(to bottom, #f0f9ff, #e0f2fe);
+      border-color: #667eea;
+    }
+    .file-icon {
+      transition: all 0.3s ease;
+    }
+    .file-icon:hover {
+      transform: scale(1.05);
+    }
+    .animate-spin {
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      100% { transform: rotate(360deg); }
+    }
+    .tab-btn {
+        padding: 0.75rem 1.5rem;
+        border-radius: 0.75rem;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+    .tab-btn-active {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+    .tab-btn-inactive {
+        background-color: #e9ecef;
+        color: #495057;
+    }
+    .tab-btn-inactive:hover {
+        background-color: #dee2e6;
+    }
+    .color-swatch {
+        width: 40px;
+        height: 40px;
+        border-radius: 0.5rem;
+        margin-right: 0.5rem;
+        border: 1px solid #ccc;
+        display: inline-block;
+    }
+    .keyword-bar-container {
+        display: flex;
+        align-items: center;
+        margin-bottom: 0.25rem;
+        font-size: 0.875rem;
+    }
+    .keyword-bar {
+        height: 20px;
+        background-color: #667eea; /* Indigo color for bars */
+        border-radius: 0.25rem;
+        margin-right: 0.5rem;
+        color: white;
+        display: flex;
+        align-items: center;
+        padding-left: 0.5rem;
+        font-size: 0.75rem;
+        overflow: hidden;
+        white-space: nowrap;
+    }
+    .keyword-label {
+        min-width: 100px; /* Adjust as needed */
+        margin-right: 0.5rem;
+    }
+    .metadata-grid {
+        display: grid;
+        grid-template-columns: auto 1fr; /* Label and value */
+        gap: 0.5rem 1rem; /* Row and column gap */
+        font-size: 0.875rem;
+    }
+    .metadata-label {
+        font-weight: 500;
+        color: #4a5568; /* gray-700 */
+        white-space: nowrap;
+    }
+    .metadata-value {
+        color: #2d3748; /* gray-800 */
+        word-break: break-all; /* Break long strings */
+    }
+  </style>
+</head>
+<body class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50 p-4">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    function App() {
+      // --- STATE VARIABLES ---
+      const [file, setFile] = React.useState(null);
+      const [fileType, setFileType] = React.useState('');
+      const [algorithm, setAlgorithm] = React.useState(''); // For compression
+      const [outputPath, setOutputPath] = React.useState(''); // For compressed file download link
+      const [error, setError] = React.useState(''); // For compression errors
+      const [isDragging, setIsDragging] = React.useState(false);
+      const [isCompressing, setIsCompressing] = React.useState(false);
+      const [activeTab, setActiveTab] = React.useState('compress'); // 'compress', 'analyze', 'results'
+      const [analysisType, setAnalysisType] = React.useState(''); // For analysis
+      const [analysisResult, setAnalysisResult] = React.useState(null); // For analysis results
+      const [isAnalyzing, setIsAnalyzing] = React.useState(false);
+      const [analysisError, setAnalysisError] = React.useState(''); // For analysis errors
+
+      // --- FILE TYPE DETECTION ---
+      const getFileType = (filename) => {
+        if (!filename) return '';
+        const ext = filename.split('.').pop().toLowerCase();
+        if (['txt', 'pdf', 'doc', 'docx', 'md', 'log', 'csv', 'json', 'xml', 'html', 'css', 'js', 'py'].includes(ext)) return 'text';
+        if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp', 'ico'].includes(ext)) return 'image';
+        if (['mp4', 'avi', 'mov', 'mkv', 'webm', 'flv'].includes(ext)) return 'video';
+        if (['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a'].includes(ext)) return 'audio';
+        return 'other';
+      };
+
+      // --- FILE ICON MAPPING ---
+      const getFileIcon = (type) => {
+        switch(type) {
+          case 'text': return 'fa-file-alt';
+          case 'image': return 'fa-file-image';
+          case 'video': return 'fa-file-video';
+          case 'audio': return 'fa-file-audio';
+          default: return 'fa-file';
+        }
+      };
+
+      // --- ALGORITHM AND ANALYSIS TYPE DEFINITIONS ---
+      const compressionAlgorithms = {
+        text: ['LZ77', 'Huffman'],
+        image: ['ColorLossy', 'Deflate', 'Lossless', 'Lossy'],
+        video: ['HEVC', 'AVC'],
+        audio: ['MP3', 'AAC'], 
+        other: ['ZIP', 'GZIP'] 
+      };
+      const algorithmDescriptions = {
+        LZ77: 'Good for repetitive text patterns', Huffman: 'Optimal for character frequency encoding',
+        ColorLossy: 'Reduces color depth (lossy)', Deflate: 'General purpose lossless compression',
+        Lossless: 'Preserves image quality completely', Lossy: 'Higher compression with some quality loss',
+        HEVC: 'High Efficiency Video Coding (H.265)', AVC: 'Advanced Video Coding (H.264)',
+        MP3: 'Common lossy audio compression', AAC: 'Advanced Audio Coding',
+        ZIP: 'Archive format with lossless compression', GZIP: 'Single file lossless compression'
+      };
+      const analysisTypes = {
+        text: ['Word Count', 'Character Count', 'Keyword Density'],
+        image: ['Dimension & Size', 'Color Palette', 'Metadata'],
+        video: ['Duration & Codec', 'Resolution', 'Frame Rate'], 
+        audio: ['Duration & Bitrate', 'Format Info'], 
+        other: ['File Size', 'MIME Type']
+      };
+
+      // --- EVENT HANDLERS ---
+      const handleFileChange = (selectedFile) => {
+        if (selectedFile) {
+          const type = getFileType(selectedFile.name);
+          setFile(selectedFile); setFileType(type);
+          // Reset states for new file
+          setAlgorithm(''); setOutputPath(''); setError('');
+          setAnalysisType(''); setAnalysisResult(null); setAnalysisError('');
+        }
+      };
+
+      const handleDrop = (e) => {
+        e.preventDefault(); setIsDragging(false);
+        const droppedFile = e.dataTransfer.files[0];
+        if (droppedFile) handleFileChange(droppedFile);
+      };
+
+      const handleDragEnter = (e) => { e.preventDefault(); setIsDragging(true); };
+      const handleDragLeave = (e) => { e.preventDefault(); setIsDragging(false); };
+      const handleDragOver = (e) => { e.preventDefault(); /* Necessary for drop to work */ };
+
+      // --- API CALLS ---
+      const handleCompress = async () => {
+        if (!file || !algorithm) { setError('Please select a file and a compression algorithm.'); return; }
+        setError(''); setIsCompressing(true); setOutputPath('');
+        const formData = new FormData();
+        formData.append('file', file); formData.append('algorithm', algorithm);
+        try {
+          const response = await fetch('http://localhost:5000/compress', { method: 'POST', body: formData });
+          if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.error || `Compression failed: ${response.status}`); }
+          const blob = await response.blob();
+          const url = window.URL.createObjectURL(blob);
+          setOutputPath(url);
+          setActiveTab('results'); 
+        } catch (err) { setError(`Error during compression: ${err.message}`); console.error("Compression error:", err); }
+        finally { setIsCompressing(false); }
+      };
+
+      const handleAnalyze = async () => {
+        if (!file || !analysisType) { setAnalysisError('Please select a file and an analysis type.'); return; }
+        setAnalysisError(''); setIsAnalyzing(true); setAnalysisResult(null);
+        const formData = new FormData();
+        formData.append('file', file); formData.append('analysis_type', analysisType);
+        try {
+          const response = await fetch('http://localhost:5000/analyze', { method: 'POST', body: formData });
+          if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.error || `Analysis failed: ${response.status}`); }
+          const resultData = await response.json();
+          setAnalysisResult(resultData);
+          setActiveTab('results');
+        } catch (err) { setAnalysisError(`Error during analysis: ${err.message}`); console.error("Analysis error:", err); }
+        finally { setIsAnalyzing(false); }
+      };
+
+      // --- UI COMPONENTS ---
+      const FileInputArea = () => (
+        <div
+          className={`border-2 border-dashed rounded-2xl p-8 mb-6 text-center transition-all ${isDragging ? 'drag-hover' : 'border-gray-200 hover:border-indigo-300'}`}
+          onDragEnter={handleDragEnter} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}
+        >
+          <input type="file" id="fileInput" className="hidden" onChange={(e) => handleFileChange(e.target.files[0])} />
+          <label htmlFor="fileInput" className="cursor-pointer">
+            {file ? (
+              <div className="flex flex-col items-center space-y-2">
+                <i className={`fas ${getFileIcon(fileType)} text-4xl text-indigo-500 file-icon`}></i>
+                <span className="font-medium text-indigo-600">{file.name}</span>
+                <span className="text-sm text-gray-500">{(file.size / 1024).toFixed(2)} KB</span>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center space-y-3">
+                <div className="w-16 h-16 flex items-center justify-center rounded-full bg-indigo-100">
+                  <i className="fas fa-cloud-upload-alt text-2xl text-indigo-500"></i>
+                </div>
+                <span className="font-medium text-gray-700">Drag & drop file</span>
+                <span className="text-sm text-gray-500">or click to browse</span>
+              </div>
+            )}
+          </label>
+        </div>
+      );
+      
+      const AnalysisResultsDisplay = ({ result }) => {
+        if (!result) return null;
+
+        // Helper to render metadata objects recursively
+        const renderMetadataObject = (data, indentLevel = 0) => {
+          return Object.entries(data).map(([key, value]) => {
+            const isNestedObject = typeof value === 'object' && value !== null && !Array.isArray(value);
+            return (
+              <React.Fragment key={key}>
+                <div className="metadata-label" style={{ paddingLeft: `${indentLevel * 1}rem` }}>
+                  {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}:
+                </div>
+                <div className="metadata-value">
+                  {isNestedObject 
+                    ? <div className="mt-1 mb-1 pl-2 border-l-2 border-gray-300">{renderMetadataObject(value, indentLevel + 1)}</div> 
+                    : Array.isArray(value) ? value.join(', ') : String(value)}
+                </div>
+              </React.Fragment>
+            );
+          });
+        };
+        
+        // Dimension & Size display
+        if (result.analysis_type === 'Dimension & Size' && (result.dimensions || result.format || result.mode)) {
+          return (
+            <div className="mt-3">
+              <h3 className="text-md font-semibold text-gray-600 mb-2">Image Properties:</h3>
+              <div className="metadata-grid">
+                {result.dimensions && <><span className="metadata-label">Dimensions:</span><span className="metadata-value">{result.dimensions}</span></>}
+                {result.format && <><span className="metadata-label">Format:</span><span className="metadata-value">{result.format}</span></>}
+                {result.mode && <><span className="metadata-label">Mode:</span><span className="metadata-value">{result.mode}</span></>}
+              </div>
+              {result.info && <p className="text-xs text-gray-500 mt-1">{result.info}</p>}
+            </div>
+          );
+        }
+
+        // Metadata display
+        if (result.analysis_type === 'Metadata' && result.metadata) {
+           const { EXIF, ...otherMetadata } = result.metadata; // Separate EXIF for potentially different handling
+          return (
+            <div className="mt-3">
+              <h3 className="text-md font-semibold text-gray-600 mb-2">File Metadata:</h3>
+              {Object.keys(otherMetadata).length > 0 && (
+                <div className="metadata-grid mb-3">
+                  {renderMetadataObject(otherMetadata)}
+                </div>
+              )}
+              {EXIF && Object.keys(EXIF).length > 0 && (
+                <>
+                  <h4 className="text-sm font-semibold text-gray-500 mt-2 mb-1">EXIF Data:</h4>
+                  <div className="metadata-grid">
+                    {renderMetadataObject(EXIF)}
+                  </div>
+                </>
+              )}
+               {(Object.keys(otherMetadata).length === 0 && (!EXIF || Object.keys(EXIF).length === 0)) && (
+                 <p className="text-sm text-gray-500">No metadata found or extracted.</p>
+               )}
+              {result.info && <p className="text-xs text-gray-500 mt-1">{result.info}</p>}
+            </div>
+          );
+        }
+
+        // Graphical display for Color Palette
+        if (result.analysis_type === 'Color Palette' && result.color_palette) {
+          return (
+            <div className="mt-3">
+              <h3 className="text-md font-semibold text-gray-600 mb-2">Dominant Colors:</h3>
+              <div className="flex flex-wrap items-center">
+                {result.color_palette.map((color, index) => (
+                  <div key={index} className="flex items-center mr-4 mb-2 p-1 bg-gray-50 rounded-md shadow-sm">
+                    <div className="color-swatch" style={{ backgroundColor: color.hex }}></div>
+                    <span className="text-xs text-gray-700">{color.hex} ({color.percentage}%)</span>
+                  </div>
+                ))}
+              </div>
+               {result.info && <p className="text-xs text-gray-500 mt-1">{result.info}</p>}
+            </div>
+          );
+        }
+
+        // Graphical display for Keyword Density
+        if (result.analysis_type === 'Keyword Density' && result.top_keywords) {
+          const maxCount = result.top_keywords.length > 0 ? Math.max(...result.top_keywords.map(kw => kw.count)) : 1;
+          return (
+            <div className="mt-3">
+              <h3 className="text-md font-semibold text-gray-600 mb-2">Top Keywords (Top {result.top_keywords.length}):</h3>
+              {result.top_keywords.length > 0 ? (
+                result.top_keywords.map((keyword, index) => (
+                  <div key={index} className="keyword-bar-container">
+                    <span className="keyword-label truncate" title={keyword.word}>{keyword.word}</span>
+                    <div className="flex-grow bg-gray-200 rounded-full h-5">
+                         <div 
+                            className="keyword-bar"
+                            style={{ width: `${Math.max(5, (keyword.count / maxCount) * 100)}%` }} 
+                            title={`${keyword.count} occurrences (${keyword.percentage}%)`}
+                        >
+                           <span className="ml-1 text-xs">{keyword.count}</span>
+                        </div>
+                    </div>
+                    <span className="text-xs text-gray-500 ml-2 w-12 text-right">({keyword.percentage}%)</span>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-gray-500">No keywords found or text too short for analysis.</p>
+              )}
+              {result.info && <p className="text-xs text-gray-500 mt-1">{result.info}</p>}
+            </div>
+          );
+        }
+        
+        // Fallback for other analysis types or general data (e.g., Word Count, Character Count)
+        const { filename, category, analysis_type: type, file_size_bytes, mime_type, ...specificData } = result; 
+        return (
+            <div className="mt-3">
+                 <h3 className="text-md font-semibold text-gray-600 mb-2">Analysis Details:</h3>
+                 <div className="metadata-grid">
+                    {Object.entries(specificData).map(([key, value]) => (
+                         <React.Fragment key={key}>
+                            <span className="metadata-label">{key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}:</span>
+                            <span className="metadata-value">{String(value)}</span>
+                         </React.Fragment>
+                    ))}
+                 </div>
+                 {Object.keys(specificData).length === 0 && <p className="text-sm text-gray-500">Basic file information displayed above. No further specific details for this analysis type.</p>}
+            </div>
+        );
+      };
+
+
+      // --- MAIN APP RENDER ---
+      return (
+        <div className="card rounded-3xl p-6 sm:p-8 shadow-xl w-full max-w-lg relative overflow-hidden">
+          {/* Decorative background elements */}
+          <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-indigo-100/50 -mr-16 -mt-16 z-0"></div>
+          <div className="absolute bottom-0 left-0 w-24 h-24 rounded-full bg-purple-100/50 -ml-12 -mb-12 z-0"></div>
+          
+          <div className="relative z-10">
+            <h1 className="text-3xl font-bold mb-2 text-center gradient-text">File Management & Analysis</h1>
+            <p className="text-center text-gray-500 mb-6">Compress, analyze, and manage your files.</p>
+
+            {/* Tab Navigation */}
+            <div className="flex justify-center space-x-2 sm:space-x-4 mb-6">
+              {['compress', 'analyze', 'results'].map(tabName => (
+                <button
+                  key={tabName}
+                  onClick={() => setActiveTab(tabName)}
+                  className={`tab-btn capitalize ${activeTab === tabName ? 'tab-btn-active' : 'tab-btn-inactive'}`}
+                >
+                  <i className={`fas ${tabName === 'compress' ? 'fa-compress-alt' : tabName === 'analyze' ? 'fa-search-plus' : 'fa-poll'} mr-2`}></i>
+                  {tabName}
+                </button>
+              ))}
+            </div>
+
+            {/* File Input Area (shared for compress/analyze) */}
+            {(activeTab === 'compress' || activeTab === 'analyze') && <FileInputArea />}
+
+            {/* Compress Tab Content */}
+            {activeTab === 'compress' && (
+              <div>
+                {fileType && (
+                  <div className="mb-6 space-y-4">
+                    <div>
+                      <label className="block text-gray-700 font-medium mb-2"><i className="fas fa-sliders-h mr-2 text-indigo-500"></i>Select Compression Algorithm</label>
+                      <select
+                        className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-300 focus:border-indigo-300 focus:outline-none"
+                        value={algorithm} onChange={(e) => setAlgorithm(e.target.value)}
+                        disabled={!compressionAlgorithms[fileType] || compressionAlgorithms[fileType].length === 0}
+                      >
+                        <option value="">Choose an algorithm</option>
+                        {compressionAlgorithms[fileType]?.map(algo => <option key={algo} value={algo}>{algo}</option>)}
+                        {(!compressionAlgorithms[fileType] || compressionAlgorithms[fileType].length === 0) && <option value="" disabled>No algorithms for this file type</option>}
+                      </select>
+                    </div>
+                    {algorithm && algorithmDescriptions[algorithm] && (
+                      <div className="bg-indigo-50 p-3 rounded-xl text-sm text-gray-600"><i className="fas fa-info-circle mr-2 text-indigo-500"></i>{algorithmDescriptions[algorithm]}</div>
+                    )}
+                  </div>
+                )}
+                <button className="w-full gradient-btn text-white p-3 rounded-xl font-medium flex items-center justify-center" disabled={!file || !algorithm || isCompressing} onClick={handleCompress}>
+                  {isCompressing ? (<><svg className="w-5 h-5 mr-2 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>Compressing...</>) : (<><i className="fas fa-compress-alt mr-2"></i>Compress File</>)}
+                </button>
+                {error && <div className="mt-4 bg-red-50 p-4 rounded-xl flex items-start"><i className="fas fa-exclamation-circle text-red-500 mt-0.5 mr-2"></i><p className="text-red-600">{error}</p></div>}
+              </div>
+            )}
+
+            {/* Analyze Tab Content */}
+            {activeTab === 'analyze' && (
+              <div>
+                {fileType && (
+                  <div className="mb-6 space-y-4">
+                    <div>
+                      <label className="block text-gray-700 font-medium mb-2"><i className="fas fa-lightbulb mr-2 text-indigo-500"></i>Select Analysis Type</label>
+                      <select
+                        className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-300 focus:border-indigo-300 focus:outline-none"
+                        value={analysisType} onChange={(e) => setAnalysisType(e.target.value)}
+                        disabled={!analysisTypes[fileType] || analysisTypes[fileType].length === 0}
+                      >
+                        <option value="">Choose an analysis type</option>
+                        {analysisTypes[fileType]?.map(type => <option key={type} value={type}>{type}</option>)}
+                        {(!analysisTypes[fileType] || analysisTypes[fileType].length === 0) && <option value="" disabled>No analysis options for this file type</option>}
+                      </select>
+                    </div>
+                  </div>
+                )}
+                <button className="w-full gradient-btn text-white p-3 rounded-xl font-medium flex items-center justify-center" disabled={!file || !analysisType || isAnalyzing} onClick={handleAnalyze}>
+                  {isAnalyzing ? (<><svg className="w-5 h-5 mr-2 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>Analyzing...</>) : (<><i className="fas fa-play-circle mr-2"></i>Analyze File</>)}
+                </button>
+                {analysisError && <div className="mt-4 bg-red-50 p-4 rounded-xl flex items-start"><i className="fas fa-exclamation-circle text-red-500 mt-0.5 mr-2"></i><p className="text-red-600">{analysisError}</p></div>}
+              </div>
+            )}
+
+            {/* Results Tab Content */}
+            {activeTab === 'results' && (
+              <div className="mt-4 space-y-4">
+                <h2 className="text-xl font-semibold text-gray-700 mb-3">Results</h2>
+                {/* Compression Result */}
+                {outputPath && (
+                  <div className="bg-green-50 p-4 rounded-xl">
+                    <div className="flex items-center mb-2"><i className="fas fa-check-circle text-green-500 mr-2"></i><p className="text-green-600 font-medium">Compression successful!</p></div>
+                    <a href={outputPath} download={file ? `compressed_${file.name}` : 'compressed_file'} className="flex items-center justify-center bg-white border border-indigo-200 hover:bg-indigo-50 text-indigo-600 p-3 rounded-xl mt-2 transition-all font-medium" >
+                      <i className="fas fa-download mr-2"></i>Download Compressed File
+                    </a>
+                  </div>
+                )}
+
+                {/* Analysis Result */}
+                {analysisResult && (
+                  <div className="bg-blue-50 p-4 rounded-xl">
+                    <div className="flex items-center mb-2">
+                      <i className="fas fa-chart-bar text-blue-500 mr-2"></i>
+                      <p className="text-blue-600 font-medium">Analysis for: <span className="font-normal">{analysisResult.filename} ({analysisResult.analysis_type})</span></p>
+                    </div>
+                    {/* Display basic file info first */}
+                    <div className="metadata-grid mb-3 text-sm">
+                        <span className="metadata-label">File Name:</span><span className="metadata-value">{analysisResult.filename}</span>
+                        <span className="metadata-label">Category:</span><span className="metadata-value">{analysisResult.category}</span>
+                        <span className="metadata-label">Size:</span><span className="metadata-value">{(analysisResult.file_size_bytes / 1024).toFixed(2)} KB</span>
+                        <span className="metadata-label">MIME Type:</span><span className="metadata-value">{analysisResult.mime_type}</span>
+                    </div>
+                    <hr className="my-3 border-blue-200"/>
+                    <AnalysisResultsDisplay result={analysisResult} />
+                    {/* Display error from analysis if present */}
+                    { (analysisResult.text_analysis_error || analysisResult.image_analysis_error || analysisResult.video_analysis_error || analysisResult.audio_analysis_error) && 
+                        <div className="mt-3 bg-red-100 p-3 rounded-md text-xs text-red-700">
+                            <p><strong>Analysis Note/Error:</strong> {analysisResult.text_analysis_error || analysisResult.image_analysis_error || analysisResult.video_analysis_error || analysisResult.audio_analysis_error}</p>
+                        </div>
+                    }
+                  </div>
+                )}
+                
+                {/* Placeholder if no results */}
+                {!outputPath && !analysisResult && (
+                    <div className="text-center text-gray-500 py-8">
+                        <i className="fas fa-box-open text-4xl mb-3 text-gray-400"></i>
+                        <p>No results to display yet.</p>
+                        <p className="text-sm">Compress or analyze a file to see results here.</p>
+                    </div>
+                )}
+              </div>
+            )}
+
+            {/* Footer */}
+            <div className="mt-6 pt-4 border-t border-gray-100">
+              <div className="flex justify-between text-xs text-gray-400">
+                <span>File Management & Analysis System</span>
+                <span>v1.5.0</span> {/* Version Bump */}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    ReactDOM.render(<App />, document.getElementById('root'));
+  </script>
+</body>
+</html>
