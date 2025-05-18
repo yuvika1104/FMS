@@ -1,0 +1,29 @@
+%{ 
+#include<stdio.h>
+#include<stdlib.h>
+%} 
+  
+%token NUMBER NL 
+  
+%left '+' '-'
+%left '*' '/' '%'
+%left '(' ')'
+
+%%
+ArithmeticExpression: E NL{ printf("\nValid arithmetic expression\n"); exit(0); }; 
+
+E: E'+'E | E'-'E |E'*'E |E'/'E |E'%'E |'('E')' | NUMBER ;
+  
+%% 
+  
+void main() 
+{ 
+printf("\nEnter Arithmetic Expression: "); 
+yyparse(); 
+} 
+  
+void yyerror() 
+{ 
+   printf("\nInvalid arithmetic expression\n"); 
+   exit(0); 
+} 
