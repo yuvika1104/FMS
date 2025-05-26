@@ -1,0 +1,4 @@
+This is an example text file for testing the file compression system.
+The quick brown fox jumps over the lazy dog.
+1234567890
+File compression is fun and useful!

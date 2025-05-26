@@ -229,11 +229,11 @@ class DCTCompression:
         
         padded_img = np.zeros((padded_height, padded_width), dtype=np.float32)
         padded_img[0:img_height, 0:img_width] = img.astype(np.float32)
-        padded_img -= 128.0 # Level shift (center around zero)
+        padded_img -= 128.0 # Level shift (center around zero) ranges changes to -128 to 127
 
         for r in range(0, padded_height, block_size):
             for c in range(0, padded_width, block_size):
-                block = padded_img[r:r+block_size, c:c+block_size]
+                block = padded_img[r:r+block_size, c:c+block_size] #creates block
                 
                 dct_block = cv2.dct(block)
                 # Quantization: divide by quant_matrix and round.
@@ -274,6 +274,7 @@ class DCTCompression:
         output_file_path = "" # Initialize
 
         try:
+            # reading the magic numbers
             with open(input_file_path, 'rb') as f_in:
                 ext_len = struct.unpack('!H', f_in.read(2))[0]
                 original_extension = f_in.read(ext_len).decode('utf-8')
@@ -373,7 +374,7 @@ class DCTCompression:
 
         return output_file_path
 
-# Example Usage (Optional - for testing directly)
+# Example Usage (for testing directly)
 if __name__ == '__main__':
     # Create dummy folders for testing
     test_img_folder = "test_images_dct"

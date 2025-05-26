@@ -48,7 +48,6 @@ class DitheringCompression:
         # If we want to show manual Floyd-Steinberg:
         
         # Create a simple palette (e.g. by taking `num_colors` from a uniformly quantized space)
-        # This is a very basic palette generation. More advanced methods exist.
         if num_colors <= 0: num_colors = 2
         if num_colors > 256: num_colors = 256 # PIL quantize to P mode supports max 256
 
@@ -59,7 +58,6 @@ class DitheringCompression:
             # If `num_colors` is small (e.g. <= 256), it can convert to "P" (palette) mode.
             # For more colors, it might stay in RGB but with reduced unique colors.
             # Using quantize with a specific number of colors.
-            # This method itself often incorporates dithering.
             if hasattr(Image, 'Quantize'): # Newer Pillow versions
                  quantized_img = img.quantize(colors=num_colors, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.FLOYDSTEINBERG)
             else: # Older Pillow versions might use this
@@ -87,4 +85,3 @@ class DitheringCompression:
         return output_file_path
 
     # No specific decompress method needed as output is a standard image.
-    # The "decompression" is just viewing the image.

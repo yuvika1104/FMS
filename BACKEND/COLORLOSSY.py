@@ -12,8 +12,9 @@ class ColorLossyImageCompressor:
         """Quantize the image to reduce pixel value levels."""
         max_value = 255
         interval = max_value // (self.levels - 1)
-        quantized_image = np.round(image / interval) * interval
-        return quantized_image.astype(np.uint8)
+        quantized_image = np.round(image / interval) * interval # quantized value
+        return quantized_image.astype(np.uint8) #8 bit integer
+    
     def remove_metadata(self,image_path, output_path):
         """Remove metadata from the saved image."""
         with Image.open(image_path) as img:
@@ -31,14 +32,14 @@ class ColorLossyImageCompressor:
             raise ValueError(f"Unable to load image: {image_path}")
 
         # Quantize each channel independently
-        quantized_image = np.zeros_like(image)
+        quantized_image = np.zeros_like(image) #new array of zeros with same dimensions
         for channel in range(3):  # Iterate over RGB channels
             quantized_image[:, :, channel] = self._quantize_image(image[:, :, channel])
         cv2.imwrite(compressed_image_path, quantized_image)
         # Save the compressed image
         self.remove_metadata(compressed_image_path, final_path)
 
-    # Delete the temporary file
+        # Delete the temporary file
         os.remove(compressed_image_path)
 
         return final_path
