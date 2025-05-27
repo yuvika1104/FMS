@@ -225,5 +225,3 @@ Refer to the `/api/algorithm_details` endpoint for detailed information on each 
 - **File Upload Issues**: Check folder permissions for `Uploads`, `compressed`, `decompressed`, and `archives`.
 - **API Errors**: Review server logs (`app.py` logs errors to console) for detailed error messages.
 
-## License
-This project is licensed under the MIT License. See the `LICENSE` file for details (not provided in the codebase; consider adding one).
